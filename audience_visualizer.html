@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Audience Cohort Visualizer</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #141922;
+    --panel-2: #10141b;
+    --line: #28313d;
+    --line-2: #384453;
+    --text: #edf2f7;
+    --muted: #93a1b2;
+    --muted-2: #667384;
+    --accent: #5ad1a6;
+    --accent-2: #4aa3ff;
+    --warn: #e0a458;
+    --bad: #e06a6a;
+    --purple: #b692f6;
+    --pink: #ef88bb;
+    --green-soft: rgba(90, 209, 166, .12);
+    --blue-soft: rgba(74, 163, 255, .13);
+    --bad-soft: rgba(224, 106, 106, .12);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button, input, select {
+    font: inherit;
+  }
+
+  .wrap {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 28px;
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr);
+    gap: 24px;
+    align-items: end;
+    margin-bottom: 22px;
+  }
+
+  @media (max-width: 920px) {
+    .hero { grid-template-columns: 1fr; }
+  }
+
+  h1 {
+    margin: 0 0 10px;
+    font-size: clamp(30px, 4vw, 54px);
+    line-height: 1.04;
+    letter-spacing: -.035em;
+  }
+
+  h2 {
+    margin: 0 0 14px;
+    font-size: 12px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h3 {
+    margin: 0 0 10px;
+    font-size: 18px;
+  }
+
+  p {
+    margin: 0;
+    color: var(--muted);
+  }
+
+  .topline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+
+  .pill {
+    display: inline-flex;
+    gap: 7px;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 10px;
+    color: var(--muted);
+    font-size: 12px;
+    background: rgba(255,255,255,.02);
+  }
+
+  .pill strong { color: var(--text); font-weight: 650; }
+  .pill.ok { color: var(--accent); border-color: rgba(90, 209, 166, .35); background: var(--green-soft); }
+  .pill.warn { color: var(--warn); border-color: rgba(224, 164, 88, .4); }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+
+  .control {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+    color: var(--text);
+    min-height: 38px;
+    padding: 8px 10px;
+  }
+
+  button.control {
+    cursor: pointer;
+  }
+
+  button.control:hover, select.control:hover, input.control:focus {
+    border-color: var(--line-2);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  @media (max-width: 860px) {
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 540px) {
+    .stats { grid-template-columns: 1fr; }
+  }
+
+  .stat, .panel {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--panel);
+  }
+
+  .stat {
+    padding: 16px;
+  }
+
+  .stat .n {
+    font-size: 34px;
+    line-height: 1;
+    font-weight: 760;
+    letter-spacing: -.03em;
+    color: var(--text);
+  }
+
+  .stat .l {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .panel {
+    padding: 18px;
+    overflow: hidden;
+  }
+
+  .legend-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  @media (max-width: 980px) {
+    .legend-grid { grid-template-columns: 1fr; }
+  }
+
+  .legend-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .legend-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 9px;
+    align-items: start;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .marker {
+    width: 10px;
+    height: 10px;
+    margin-top: 5px;
+    border-radius: 50%;
+    background: var(--muted);
+    display: inline-block;
+  }
+
+  .marker.a { background: var(--accent); }
+  .marker.b { background: var(--accent-2); }
+  .marker.c { background: var(--warn); }
+  .marker.d { background: var(--purple); }
+  .marker.e { background: var(--pink); }
+  .marker.f { background: var(--bad); }
+
+  .axis-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 12px;
+  }
+
+  .axis-chip {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--panel-2);
+  }
+
+  .toolbar {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) repeat(2, minmax(170px, auto));
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  @media (max-width: 900px) {
+    .toolbar { grid-template-columns: 1fr; }
+  }
+
+  .table-shell {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: auto;
+    max-height: 620px;
+    background: var(--panel-2);
+  }
+
+  table {
+    border-collapse: collapse;
+    min-width: 2600px;
+    width: 100%;
+    font-size: 12px;
+  }
+
+  th, td {
+    border-bottom: 1px solid var(--line);
+    border-right: 1px solid rgba(40,49,61,.55);
+    padding: 9px 10px;
+    vertical-align: top;
+    text-align: left;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #151b24;
+    color: var(--muted);
+    font-weight: 650;
+    white-space: nowrap;
+  }
+
+  td {
+    color: #d8e1eb;
+    max-width: 260px;
+  }
+
+  th:first-child, td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: #151b24;
+    min-width: 92px;
+    max-width: 92px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  td:first-child {
+    background: #111720;
+  }
+
+  .view-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .view-tab {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--muted);
+    cursor: pointer;
+    padding: 7px 12px;
+    font-size: 13px;
+  }
+
+  .view-tab.active {
+    border-color: rgba(90, 209, 166, .55);
+    background: var(--green-soft);
+    color: var(--accent);
+  }
+
+  .view-pane { display: none; }
+  .view-pane.active { display: block; }
+
+  .heatmap-shell, .compare-shell {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: auto;
+    background: var(--panel-2);
+  }
+
+  .heatmap {
+    min-width: 980px;
+  }
+
+  .heatmap th:first-child, .heatmap td:first-child,
+  .compare-table th:first-child, .compare-table td:first-child {
+    min-width: 160px;
+    max-width: 220px;
+  }
+
+  .hm-cell {
+    min-width: 86px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-weight: 680;
+  }
+
+  .hm-cell small {
+    display: block;
+    margin-top: 2px;
+    color: rgba(237,242,247,.72);
+    font-weight: 500;
+  }
+
+  .swimlanes {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(210px, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+
+  @media (max-width: 1180px) {
+    .swimlanes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 680px) {
+    .swimlanes { grid-template-columns: 1fr; }
+  }
+
+  .lane {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel-2);
+    min-height: 180px;
+    padding: 12px;
+  }
+
+  .lane h3 {
+    font-size: 14px;
+    margin-bottom: 10px;
+    color: var(--muted);
+  }
+
+  .cohort-card {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(255,255,255,.025);
+    padding: 10px;
+    margin-bottom: 9px;
+  }
+
+  .cohort-card strong {
+    display: block;
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  .cohort-card .meta {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 5px;
+  }
+
+  .cohort-card.priority {
+    border-color: rgba(90, 209, 166, .45);
+    background: var(--green-soft);
+  }
+
+  .compare-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 12px;
+  }
+
+  .compare-pill {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--muted);
+    cursor: pointer;
+    padding: 5px 9px;
+    font-size: 12px;
+  }
+
+  .compare-pill.active {
+    border-color: rgba(74, 163, 255, .55);
+    background: var(--blue-soft);
+    color: var(--text);
+  }
+
+  .compare-table {
+    min-width: 900px;
+  }
+
+  .section-lead {
+    color: var(--muted);
+    font-size: 13px;
+    margin: -4px 0 12px;
+  }
+
+  .scatter-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    gap: 16px;
+  }
+
+  @media (max-width: 1050px) {
+    .scatter-layout { grid-template-columns: 1fr; }
+  }
+
+  .scatter-controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  @media (max-width: 860px) {
+    .scatter-controls { grid-template-columns: 1fr; }
+  }
+
+  .plot {
+    position: relative;
+    height: 680px;
+    min-height: 520px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background:
+      linear-gradient(90deg, transparent 49.8%, rgba(255,255,255,.08) 50%, transparent 50.2%),
+      linear-gradient(0deg, transparent 49.8%, rgba(255,255,255,.08) 50%, transparent 50.2%),
+      radial-gradient(circle at 50% 50%, rgba(255,255,255,.04), transparent 55%),
+      var(--panel-2);
+    overflow: hidden;
+  }
+
+  .plot::before {
+    content: "";
+    position: absolute;
+    inset: 42px;
+    border: 1px dashed rgba(255,255,255,.1);
+    border-radius: 12px;
+    pointer-events: none;
+  }
+
+  .axis-label {
+    position: absolute;
+    color: var(--muted-2);
+    font-size: 11px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+
+  .axis-label.x-low { left: 16px; bottom: 14px; }
+  .axis-label.x-high { right: 16px; bottom: 14px; }
+  .axis-label.y-low { left: 16px; bottom: 38px; writing-mode: vertical-rl; transform: rotate(180deg); }
+  .axis-label.y-high { left: 16px; top: 14px; writing-mode: vertical-rl; transform: rotate(180deg); }
+
+  .point {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .point .dot {
+    display: block;
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(11,13,16,.85);
+    background: var(--muted);
+  }
+
+  .point.priority .dot {
+    width: 20px;
+    height: 20px;
+    border-color: var(--accent);
+  }
+
+  .point .label {
+    display: block;
+    margin-top: 3px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: rgba(11,13,16,.68);
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .point.selected .label {
+    color: var(--text);
+    background: rgba(90, 209, 166, .2);
+  }
+
+  .point.family-A .dot { background: var(--accent); }
+  .point.family-B .dot { background: var(--accent-2); }
+  .point.family-C .dot { background: var(--warn); }
+  .point.family-D .dot { background: var(--purple); }
+  .point.family-E .dot { background: var(--pink); }
+  .point.family-F .dot { background: var(--bad); }
+
+  .detail-card {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--panel-2);
+    padding: 16px;
+    min-height: 260px;
+  }
+
+  .detail-card .code {
+    color: var(--accent);
+    font-weight: 760;
+    font-size: 22px;
+    letter-spacing: -.02em;
+  }
+
+  .kv {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .kv div {
+    border-top: 1px solid var(--line);
+    padding-top: 9px;
+  }
+
+  .kv strong {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 3px;
+  }
+
+  .kv span {
+    color: #d8e1eb;
+    font-size: 13px;
+  }
+
+  .note {
+    font-size: 12px;
+    color: var(--muted-2);
+    margin-top: 10px;
+  }
+
+  .empty {
+    color: var(--warn);
+    border: 1px dashed rgba(224,164,88,.5);
+    background: rgba(224,164,88,.08);
+    border-radius: 14px;
+    padding: 14px;
+    margin-top: 14px;
+  }
+
+  .server-help {
+    display: none;
+    margin-top: 12px;
+  }
+
+  .server-help.visible {
+    display: block;
+  }
+
+  .server-help pre {
+    white-space: pre-wrap;
+    margin: 10px 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px;
+    background: var(--panel-2);
+    color: var(--text);
+    font-size: 12px;
+  }
+
+  .server-help a {
+    color: var(--accent);
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <div class="topline">
+        <span class="pill ok" id="sourceStatus">loading</span>
+        <span class="pill"><strong id="sourceFile">audience_02.md</strong></span>
+      </div>
+      <h1 data-i18n="title">Audience Cohort Visualizer</h1>
+      <p data-i18n="subtitle">SPA reads the markdown schema and cohort cards from the source file, then builds legends, a searchable table and two-axis projections.</p>
+      <div class="server-help" id="serverHelp">
+        <p data-i18n="serverHelpText">Open this visualizer through a local HTTP server so the browser can read the adjacent markdown file automatically.</p>
+        <pre><code id="serverCommand"></code></pre>
+        <p><a id="serverLink" href="http://127.0.0.1:8787/audience_visualizer.html">http://127.0.0.1:8787/audience_visualizer.html</a></p>
+      </div>
+    </div>
+    <div class="controls">
+      <select class="control" id="langSelect" aria-label="Language">
+        <option value="ru">Русский</option>
+        <option value="en">English</option>
+      </select>
+      <button class="control" id="reloadBtn" type="button" data-i18n="reload">Reload markdown</button>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="stats">
+      <div class="stat"><div class="n" id="statCohorts">0</div><div class="l" data-i18n="cohorts">Cohorts</div></div>
+      <div class="stat"><div class="n" id="statAxes">0</div><div class="l" data-i18n="axes">Axes parsed from markdown</div></div>
+      <div class="stat"><div class="n" id="statPriority">0</div><div class="l" data-i18n="priority">Priority candidates</div></div>
+      <div class="stat"><div class="n" id="statVisible">0</div><div class="l" data-i18n="visible">Visible after filters</div></div>
+    </div>
+
+    <div class="panel">
+      <h2 data-i18n="legends">Legends</h2>
+      <div class="legend-grid">
+        <div>
+          <h3 data-i18n="driverLegend">Drivers D1-D4</h3>
+          <div class="legend-list" id="driverLegend"></div>
+        </div>
+        <div>
+          <h3 data-i18n="familyLegend">Cohort families</h3>
+          <div class="legend-list" id="familyLegend"></div>
+        </div>
+        <div>
+          <h3 data-i18n="scoreLegend">2D projection scoring</h3>
+          <div class="legend-list" id="scoreLegend"></div>
+        </div>
+      </div>
+      <div class="axis-chips" id="axisChips"></div>
+    </div>
+
+    <div class="panel">
+      <h2 data-i18n="tableTitle">Full table</h2>
+      <div class="toolbar">
+        <input class="control" id="searchInput" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="Search cohorts, countries, tools, risks..." />
+        <select class="control" id="familyFilter"></select>
+        <select class="control" id="decisionFilter"></select>
+      </div>
+      <div class="table-shell">
+        <table id="cohortTable"></table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 data-i18n="visualTitle">Cohort views</h2>
+      <div class="view-tabs" id="viewTabs">
+        <button class="view-tab active" type="button" data-view="heatmap" data-i18n="viewHeatmap">Heatmap</button>
+        <button class="view-tab" type="button" data-view="swimlanes" data-i18n="viewSwimlanes">Swimlanes</button>
+        <button class="view-tab" type="button" data-view="compare" data-i18n="viewCompare">Compare</button>
+        <button class="view-tab" type="button" data-view="map" data-i18n="viewMap">Map experiment</button>
+      </div>
+
+      <div class="view-pane active" id="view-heatmap">
+        <p class="section-lead" data-i18n="heatmapNote">Rows are cohorts, columns are interpretable scored dimensions. Darker cells mean stronger expression of that dimension.</p>
+        <div class="heatmap-shell">
+          <table class="heatmap" id="heatmapTable"></table>
+        </div>
+      </div>
+
+      <div class="view-pane" id="view-swimlanes">
+        <p class="section-lead" data-i18n="swimlaneNote">Strategic buckets from the confidence/decision field. This is usually the fastest way to inspect beachheads.</p>
+        <div class="swimlanes" id="swimlanes"></div>
+      </div>
+
+      <div class="view-pane" id="view-compare">
+        <p class="section-lead" data-i18n="compareHint">Pick several cohorts and compare their raw markdown fields side by side.</p>
+        <div class="compare-picker" id="comparePicker"></div>
+        <div class="compare-shell">
+          <table class="compare-table" id="compareTable"></table>
+        </div>
+      </div>
+
+      <div class="view-pane" id="view-map">
+        <p class="section-lead" data-i18n="mapNote">Experimental view: only use it for axes that can be interpreted as intensity scales.</p>
+        <div class="scatter-controls">
+          <select class="control" id="xAxisSelect"></select>
+          <select class="control" id="yAxisSelect"></select>
+          <select class="control" id="colorSelect">
+            <option value="family" data-i18n="colorFamily">Color by family</option>
+            <option value="decision" data-i18n="colorDecision">Color by decision</option>
+          </select>
+        </div>
+        <div class="scatter-layout">
+          <div class="plot" id="plot">
+            <div class="axis-label x-low" id="xLow">low</div>
+            <div class="axis-label x-high" id="xHigh">high</div>
+            <div class="axis-label y-low" id="yLow">low</div>
+            <div class="axis-label y-high" id="yHigh">high</div>
+          </div>
+          <aside class="detail-card" id="detailCard"></aside>
+        </div>
+        <p class="note" data-i18n="projectionNote">Projection is heuristic: it converts each selected text field into a 0-1 score using explicit intensity words, driver symbols, numeric ranges and axis-specific keywords. Click a cohort to inspect the raw values.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const SOURCE_FILE = 'audience_02.md';
+const LOCAL_PORT = 8787;
+const LOCAL_URL = `http://127.0.0.1:${LOCAL_PORT}/`;
+
+const state = {
+  lang: 'ru',
+  markdown: '',
+  axes: [],
+  axisDescriptions: new Map(),
+  drivers: [],
+  cohorts: [],
+  filtered: [],
+  selectedCode: null,
+  activeView: 'heatmap',
+  compareCodes: []
+};
+
+const UI = {
+  ru: {
+    title: 'Визуализатор когорт аудитории',
+    subtitle: 'SPA читает markdown-схему и карточки когорт из исходного файла, затем строит легенды, таблицу с поиском и двумерные свертки.',
+    reload: 'Перечитать markdown',
+    serverHelpText: 'Открой визуализатор через локальный HTTP-сервер, чтобы браузер автоматически прочитал соседний audience_02.md.',
+    cohorts: 'Когорт',
+    axes: 'Осей из markdown',
+    priority: 'Priority candidates',
+    visible: 'Видно после фильтров',
+    legends: 'Легенды',
+    driverLegend: 'Драйверы D1-D4',
+    familyLegend: 'Семейства когорт',
+    scoreLegend: 'Скоринг 2D-свертки',
+    tableTitle: 'Вся таблица',
+    visualTitle: 'Визуализации когорт',
+    viewHeatmap: 'Heatmap',
+    viewSwimlanes: 'Swimlanes',
+    viewCompare: 'Compare',
+    viewMap: 'Map experiment',
+    heatmapNote: 'Строки — когорты, колонки — осмысленно скорируемые измерения. Чем ярче ячейка, тем сильнее выражено измерение.',
+    swimlaneNote: 'Стратегические buckets из поля confidence/decision. Обычно это самый быстрый способ смотреть beachheads.',
+    compareHint: 'Выбери несколько когорт и сравни их сырые markdown-поля рядом.',
+    mapNote: 'Экспериментальный режим: используй только оси, которые можно читать как шкалы интенсивности.',
+    searchPlaceholder: 'Искать когорты, страны, инструменты, риски...',
+    allFamilies: 'Все семейства',
+    allDecisions: 'Все решения',
+    colorFamily: 'Цвет по семейству',
+    colorDecision: 'Цвет по решению',
+    low: 'слабее выражено',
+    high: 'сильнее выражено',
+    selected: 'Выбранная когорта',
+    noSelection: 'Кликни на точку, чтобы увидеть сырые значения по выбранным осям.',
+    rawX: 'X axis raw value',
+    rawY: 'Y axis raw value',
+    score: 'Скор',
+    decision: 'Решение',
+    sourceLoaded: 'source loaded',
+    sourceHttpRequired: 'open via HTTP',
+    sourceError: 'source load failed',
+    projectionNote: 'Свертка эвристическая: каждое выбранное текстовое поле переводится в скор 0-1 через явные слова интенсивности, driver-symbols, числовые диапазоны и словари по оси. Клик по когорте показывает сырые значения.',
+    scoreRules: [
+      '● / ◐ / — в Drivers дают сильный, средний или нулевой вклад.',
+      'Слова very high / high / medium / low и их контекст нормализуются в 0-1.',
+      'Для категориальных полей используется осевой словарь: mobility, capital, rails, privacy, regulation, tools.'
+    ],
+    families: {
+      A: 'A · cross-border finance',
+      B: 'B · privacy / sovereignty',
+      C: 'C · scenario anxiety',
+      D: 'D · mobility / nomadism',
+      E: 'E · transition use cases',
+      F: 'F · founder calibration'
+    }
+  },
+  en: {
+    title: 'Audience Cohort Visualizer',
+    subtitle: 'The SPA reads the markdown schema and cohort cards from the source file, then builds legends, a searchable table and two-axis projections.',
+    reload: 'Reload markdown',
+    serverHelpText: 'Open this visualizer through a local HTTP server so the browser can read the adjacent audience_02.md automatically.',
+    cohorts: 'Cohorts',
+    axes: 'Axes parsed from markdown',
+    priority: 'Priority candidates',
+    visible: 'Visible after filters',
+    legends: 'Legends',
+    driverLegend: 'Drivers D1-D4',
+    familyLegend: 'Cohort families',
+    scoreLegend: '2D projection scoring',
+    tableTitle: 'Full table',
+    visualTitle: 'Cohort views',
+    viewHeatmap: 'Heatmap',
+    viewSwimlanes: 'Swimlanes',
+    viewCompare: 'Compare',
+    viewMap: 'Map experiment',
+    heatmapNote: 'Rows are cohorts, columns are interpretable scored dimensions. Brighter cells mean stronger expression of that dimension.',
+    swimlaneNote: 'Strategic buckets from the confidence/decision field. This is usually the fastest way to inspect beachheads.',
+    compareHint: 'Pick several cohorts and compare their raw markdown fields side by side.',
+    mapNote: 'Experimental view: only use it for axes that can be interpreted as intensity scales.',
+    searchPlaceholder: 'Search cohorts, countries, tools, risks...',
+    allFamilies: 'All families',
+    allDecisions: 'All decisions',
+    colorFamily: 'Color by family',
+    colorDecision: 'Color by decision',
+    low: 'weaker expression',
+    high: 'stronger expression',
+    selected: 'Selected cohort',
+    noSelection: 'Click a point to inspect raw values for the selected axes.',
+    rawX: 'X axis raw value',
+    rawY: 'Y axis raw value',
+    score: 'Score',
+    decision: 'Decision',
+    sourceLoaded: 'source loaded',
+    sourceHttpRequired: 'open via HTTP',
+    sourceError: 'source load failed',
+    projectionNote: 'Projection is heuristic: it converts each selected text field into a 0-1 score using explicit intensity words, driver symbols, numeric ranges and axis-specific dictionaries. Click a cohort to inspect raw values.',
+    scoreRules: [
+      '● / ◐ / — in Drivers map to strong, medium or zero contribution.',
+      'Words like very high / high / medium / low are normalized into 0-1.',
+      'Categorical fields use axis-specific dictionaries: mobility, capital, rails, privacy, regulation, tools.'
+    ],
+    families: {
+      A: 'A · cross-border finance',
+      B: 'B · privacy / sovereignty',
+      C: 'C · scenario anxiety',
+      D: 'D · mobility / nomadism',
+      E: 'E · transition use cases',
+      F: 'F · founder calibration'
+    }
+  }
+};
+
+const AXIS_RU = {
+  'Segment ID / name': 'ID / название сегмента',
+  'Origin / citizenship background': 'Происхождение / гражданство',
+  'Current residence / bases': 'Текущая база / базы',
+  'Mobility state': 'Состояние мобильности',
+  'Typical country pairs / corridors': 'Типичные страновые коридоры',
+  'Income pattern': 'Паттерн дохода',
+  'Asset pattern': 'Паттерн активов',
+  'Currency exposure': 'Валютная экспозиция',
+  'Family': 'Семья',
+  'Obligations': 'Обязательства',
+  'Status': 'Статус',
+  'Life stage': 'Жизненная стадия',
+  'Capital level': 'Уровень капитала',
+  'Core JTBD': 'Главная задача пользователя',
+  'Trigger moments': 'Триггеры',
+  'Planning / anxiety pattern': 'Планирование / тревога',
+  'Mindset / behavior': 'Мышление / поведение',
+  'Drivers D1-D4': 'Драйверы D1-D4',
+  'Privacy / trust posture': 'Приватность / доверие',
+  'Money-movement need': 'Потребность перемещения денег',
+  'Rails used / needed': 'Используемые / нужные rails',
+  'Tools currently used': 'Текущие инструменты',
+  'WTP proxy': 'Прокси готовности платить',
+  'Reachable channels': 'Каналы доступа',
+  'Competitor adjacency': 'Соседние конкуренты',
+  'Regulatory / trust risk': 'Регуляторный / trust risk',
+  'Confidence / decision / unknowns': 'Уверенность / решение / неизвестные'
+};
+
+const AXIS_CANONICAL = Object.fromEntries(Object.entries(AXIS_RU).map(([en, ru]) => [ru, en]));
+
+function canonicalAxis(axis) {
+  return AXIS_CANONICAL[axis] || axis;
+}
+
+function t(key) {
+  return UI[state.lang][key] || UI.en[key] || key;
+}
+
+function axisLabel(axis) {
+  return state.lang === 'ru' ? (AXIS_RU[axis] || axis) : axis;
+}
+
+function escapeHTML(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function inlineMd(value) {
+  return escapeHTML(value)
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+async function loadMarkdown() {
+  setSourceStatus('loading', 'warn');
+  setServerHelp();
+
+  if (window.location.protocol === 'file:') {
+    setSourceStatus(t('sourceHttpRequired'), 'warn');
+    document.getElementById('serverHelp').classList.add('visible');
+    return;
+  }
+
+  try {
+    const sourceUrl = new URL(SOURCE_FILE, window.location.href);
+    sourceUrl.searchParams.set('v', String(Date.now()));
+    const response = await fetch(sourceUrl, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const markdown = await response.text();
+    applyMarkdown(markdown);
+    setSourceStatus(t('sourceLoaded'), 'ok');
+    document.getElementById('serverHelp').classList.remove('visible');
+  } catch (error) {
+    setSourceStatus(t('sourceError'), 'warn');
+    document.getElementById('serverHelp').classList.add('visible');
+  }
+}
+
+function setServerHelp() {
+  const command = `npm run dev`;
+  document.getElementById('serverCommand').textContent = command;
+  const link = document.getElementById('serverLink');
+  link.href = LOCAL_URL;
+  link.textContent = LOCAL_URL;
+}
+
+function setSourceStatus(text, mode) {
+  const el = document.getElementById('sourceStatus');
+  el.textContent = text;
+  el.className = `pill ${mode || ''}`;
+}
+
+function applyMarkdown(markdown) {
+  state.markdown = markdown;
+  const parsed = parseAudienceMarkdown(markdown);
+  state.axes = parsed.axes;
+  state.axisDescriptions = parsed.axisDescriptions;
+  state.drivers = parsed.drivers;
+  state.cohorts = parsed.cohorts;
+  state.selectedCode = state.cohorts[0]?.code || null;
+  hydrateControls();
+  renderAll();
+}
+
+function parseAudienceMarkdown(markdown) {
+  const axisDescriptions = new Map();
+  const schema = extractBetween(markdown, /## 1\.[^\n]*\n/, /\n## 2\./);
+  const axes = [];
+
+  for (const line of schema.split('\n')) {
+    const match = line.match(/^(\d+)\.\s+\*\*(.+?)\*\*\s+—\s+(.+)$/);
+    if (!match) continue;
+    const axis = canonicalAxis(match[2].trim());
+    axes.push(axis);
+    axisDescriptions.set(axis, match[3].trim());
+  }
+
+  const driverBlock = extractBetween(markdown, /## 0\.[^\n]*\n/, /\n## 1\./);
+  const drivers = [];
+  for (const line of driverBlock.split('\n')) {
+    const match = line.match(/^-\s+\*\*(D\d\s+·\s+.+?)\*\*\s+—\s+(.+)$/);
+    if (match) drivers.push({ name: match[1].trim(), description: match[2].trim() });
+  }
+
+  const grid = extractBetween(markdown, /## 3\.[^\n]*\n/, /\n## 4\./);
+  const cohorts = [];
+  const sections = grid
+    .split(/\n(?=###\s+)/)
+    .map(section => section.trim())
+    .filter(section => section.startsWith('### '));
+
+  for (const section of sections) {
+    const lines = section.split('\n');
+    const title = lines[0].replace(/^###\s+/, '').trim();
+    const block = lines.slice(1).join('\n');
+    const values = {};
+    for (const line of block.split('\n')) {
+      const field = line.match(/^(\d+)\.\s+\*\*(.+?):\*\*\s*(.*)$/);
+      if (!field) continue;
+      values[canonicalAxis(field[2].trim())] = field[3].trim();
+    }
+    if (!values['Segment ID / name']) continue;
+    const code = (values['Segment ID / name'].match(/^([A-Z][0-9][a-z]?|F0)/) || title.match(/^([A-Z][0-9][a-z]?|F0)/) || [null, title])[1];
+    cohorts.push({
+      title,
+      code,
+      family: code[0],
+      decision: parseDecision(values['Confidence / decision / unknowns'] || ''),
+      values
+    });
+  }
+
+  return { axes, axisDescriptions, drivers, cohorts };
+}
+
+function extractBetween(text, startRe, endRe) {
+  const start = text.search(startRe);
+  if (start < 0) return '';
+  const afterStart = text.slice(start).match(startRe);
+  const offset = start + (afterStart ? afterStart[0].length : 0);
+  const rest = text.slice(offset);
+  const end = rest.search(endRe);
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
+function parseDecision(value) {
+  const lower = value.toLowerCase();
+  if (lower.includes('priority candidate') || lower.includes('приоритет')) return 'priority';
+  if (lower.includes('keep') || lower.includes('оставить') || lower.includes('сохранять')) return 'keep';
+  if (lower.includes('use case') || lower.includes('сценарий использования')) return 'use-case';
+  if (lower.includes('needs more evidence') || lower.includes('нужно больше доказательств')) return 'needs-evidence';
+  if (lower.includes('calibration') || lower.includes('калибров')) return 'calibration';
+  return 'unknown';
+}
+
+function decisionLabel(decision) {
+  const labels = {
+    ru: {
+      priority: 'priority candidate',
+      keep: 'keep / enrich',
+      'use-case': 'use case',
+      'needs-evidence': 'needs more evidence',
+      calibration: 'calibration only',
+      unknown: 'unknown'
+    },
+    en: {
+      priority: 'priority candidate',
+      keep: 'keep / enrich',
+      'use-case': 'use case',
+      'needs-evidence': 'needs more evidence',
+      calibration: 'calibration only',
+      unknown: 'unknown'
+    }
+  };
+  return labels[state.lang][decision] || decision;
+}
+
+function hydrateControls() {
+  const mappableAxes = heatmapAxes();
+  const axisOptions = mappableAxes.map(axis => `<option value="${escapeHTML(axis)}">${escapeHTML(axisLabel(axis))}</option>`).join('');
+  document.getElementById('xAxisSelect').innerHTML = axisOptions;
+  document.getElementById('yAxisSelect').innerHTML = axisOptions;
+
+  const defaultX = mappableAxes.includes('Privacy / trust posture') ? 'Privacy / trust posture' : mappableAxes[0];
+  const defaultY = mappableAxes.includes('Planning / anxiety pattern') ? 'Planning / anxiety pattern' : mappableAxes[1] || mappableAxes[0];
+  document.getElementById('xAxisSelect').value = defaultX;
+  document.getElementById('yAxisSelect').value = defaultY;
+
+  const families = [...new Set(state.cohorts.map(c => c.family))].sort();
+  document.getElementById('familyFilter').innerHTML = [
+    `<option value="">${escapeHTML(t('allFamilies'))}</option>`,
+    ...families.map(f => `<option value="${f}">${escapeHTML(UI[state.lang].families[f] || f)}</option>`)
+  ].join('');
+
+  const decisions = [...new Set(state.cohorts.map(c => c.decision))].sort();
+  document.getElementById('decisionFilter').innerHTML = [
+    `<option value="">${escapeHTML(t('allDecisions'))}</option>`,
+    ...decisions.map(d => `<option value="${d}">${escapeHTML(decisionLabel(d))}</option>`)
+  ].join('');
+}
+
+function renderAll() {
+  applyI18n();
+  renderStats();
+  renderLegends();
+  renderTable();
+  renderVisualViews();
+  renderPlot();
+}
+
+function applyI18n() {
+  document.documentElement.lang = state.lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) {
+    el.textContent = t(el.dataset.i18n);
+  }
+  for (const el of document.querySelectorAll('[data-i18n-placeholder]')) {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  }
+  for (const option of document.querySelectorAll('#colorSelect option[data-i18n]')) {
+    option.textContent = t(option.dataset.i18n);
+  }
+  setServerHelp();
+}
+
+function renderStats() {
+  const visible = getFilteredCohorts();
+  document.getElementById('statCohorts').textContent = state.cohorts.length;
+  document.getElementById('statAxes').textContent = state.axes.length;
+  document.getElementById('statPriority').textContent = state.cohorts.filter(c => c.decision === 'priority').length;
+  document.getElementById('statVisible').textContent = visible.length;
+}
+
+function renderLegends() {
+  const driverEl = document.getElementById('driverLegend');
+  driverEl.innerHTML = state.drivers.map((driver, index) => `
+    <div class="legend-row">
+      <i class="marker ${['a','b','c','d'][index] || 'a'}"></i>
+      <div><strong>${escapeHTML(driver.name)}</strong><br>${inlineMd(driver.description)}</div>
+    </div>
+  `).join('');
+
+  const families = [...new Set(state.cohorts.map(c => c.family))].sort();
+  document.getElementById('familyLegend').innerHTML = families.map(f => `
+    <div class="legend-row">
+      <i class="marker ${f.toLowerCase()}"></i>
+      <div><strong>${escapeHTML(f)}</strong><br>${escapeHTML(UI[state.lang].families[f] || f)}</div>
+    </div>
+  `).join('');
+
+  document.getElementById('scoreLegend').innerHTML = UI[state.lang].scoreRules.map((rule, index) => `
+    <div class="legend-row">
+      <i class="marker ${['a','b','c'][index] || 'a'}"></i>
+      <div>${escapeHTML(rule)}</div>
+    </div>
+  `).join('');
+
+  document.getElementById('axisChips').innerHTML = state.axes.map((axis, index) => `
+    <span class="axis-chip" title="${escapeHTML(state.axisDescriptions.get(axis) || '')}">${index + 1}. ${escapeHTML(axisLabel(axis))}</span>
+  `).join('');
+}
+
+function getFilteredCohorts() {
+  const query = document.getElementById('searchInput')?.value.trim().toLowerCase() || '';
+  const family = document.getElementById('familyFilter')?.value || '';
+  const decision = document.getElementById('decisionFilter')?.value || '';
+
+  state.filtered = state.cohorts.filter(cohort => {
+    if (family && cohort.family !== family) return false;
+    if (decision && cohort.decision !== decision) return false;
+    if (!query) return true;
+    const haystack = [
+      cohort.title,
+      cohort.code,
+      cohort.family,
+      cohort.decision,
+      ...Object.values(cohort.values)
+    ].join(' ').toLowerCase();
+    return haystack.includes(query);
+  });
+  return state.filtered;
+}
+
+function renderTable() {
+  const cohorts = getFilteredCohorts();
+  renderStats();
+  const table = document.getElementById('cohortTable');
+  const headers = state.axes.map(axis => `<th title="${escapeHTML(state.axisDescriptions.get(axis) || '')}">${escapeHTML(axisLabel(axis))}</th>`).join('');
+  const rows = cohorts.map(cohort => `
+    <tr>
+      ${state.axes.map(axis => {
+        const value = cohort.values[axis] || '';
+        const first = axis === 'Segment ID / name';
+        return `<td>${first ? `<strong>${escapeHTML(cohort.code)}</strong><br>` : ''}${inlineMd(value)}</td>`;
+      }).join('')}
+    </tr>
+  `).join('');
+  table.innerHTML = `<thead><tr>${headers}</tr></thead><tbody>${rows}</tbody>`;
+}
+
+function renderVisualViews() {
+  renderViewTabs();
+  renderHeatmap();
+  renderSwimlanes();
+  renderComparePicker();
+  renderCompare();
+}
+
+function renderViewTabs() {
+  for (const tab of document.querySelectorAll('.view-tab')) {
+    tab.classList.toggle('active', tab.dataset.view === state.activeView);
+  }
+  for (const pane of document.querySelectorAll('.view-pane')) {
+    pane.classList.toggle('active', pane.id === `view-${state.activeView}`);
+  }
+}
+
+function heatmapAxes() {
+  const preferred = [
+    'Drivers D1-D4',
+    'Mobility state',
+    'Privacy / trust posture',
+    'Planning / anxiety pattern',
+    'Capital level',
+    'Money-movement need',
+    'Rails used / needed',
+    'Regulatory / trust risk',
+    'Confidence / decision / unknowns'
+  ];
+  return preferred.filter(axis => state.axes.includes(axis));
+}
+
+function renderHeatmap() {
+  const axes = heatmapAxes();
+  const cohorts = getFilteredCohorts();
+  const table = document.getElementById('heatmapTable');
+  const headers = [
+    '<th>Cohort</th>',
+    ...axes.map(axis => `<th title="${escapeHTML(state.axisDescriptions.get(axis) || '')}">${escapeHTML(axisLabel(axis))}</th>`)
+  ].join('');
+  const rows = cohorts.map(cohort => `
+    <tr>
+      <td><strong>${escapeHTML(cohort.code)}</strong><br>${escapeHTML(shortName(cohort))}</td>
+      ${axes.map(axis => heatmapCell(cohort, axis)).join('')}
+    </tr>
+  `).join('');
+  table.innerHTML = `<thead><tr>${headers}</tr></thead><tbody>${rows}</tbody>`;
+}
+
+function heatmapCell(cohort, axis) {
+  const score = scoreAxis(cohort, axis);
+  const alpha = clamp(.12 + score * .68, .08, .82);
+  const color = score > .72 ? `rgba(90, 209, 166, ${alpha})` : score > .45 ? `rgba(74, 163, 255, ${alpha})` : `rgba(147, 161, 178, ${alpha})`;
+  return `<td class="hm-cell" title="${escapeHTML(cohort.values[axis] || '')}" style="background:${color}">${score.toFixed(2)}<small>${escapeHTML(scoreLabel(score))}</small></td>`;
+}
+
+function scoreLabel(score) {
+  if (score >= .72) return 'high';
+  if (score >= .45) return 'mid';
+  if (score >= .2) return 'low';
+  return 'weak';
+}
+
+function renderSwimlanes() {
+  const order = ['priority', 'keep', 'use-case', 'needs-evidence', 'calibration', 'unknown'];
+  const cohorts = getFilteredCohorts();
+  const byDecision = new Map(order.map(key => [key, []]));
+  for (const cohort of cohorts) {
+    if (!byDecision.has(cohort.decision)) byDecision.set(cohort.decision, []);
+    byDecision.get(cohort.decision).push(cohort);
+  }
+  document.getElementById('swimlanes').innerHTML = [...byDecision.entries()]
+    .filter(([, items]) => items.length)
+    .map(([decision, items]) => `
+      <div class="lane">
+        <h3>${escapeHTML(decisionLabel(decision))} · ${items.length}</h3>
+        ${items.map(cohort => `
+          <div class="cohort-card ${cohort.decision === 'priority' ? 'priority' : ''}">
+            <strong>${escapeHTML(cohort.code)} · ${escapeHTML(shortName(cohort))}</strong>
+            <div class="meta">${escapeHTML(cohort.values['Core JTBD'] || '')}</div>
+            <div class="meta">${escapeHTML(cohort.values['Drivers D1-D4'] || '')}</div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+}
+
+function renderComparePicker() {
+  const cohorts = getFilteredCohorts();
+  if (!state.compareCodes.length) {
+    state.compareCodes = cohorts.filter(c => c.decision === 'priority').slice(0, 4).map(c => c.code);
+    if (!state.compareCodes.length) state.compareCodes = cohorts.slice(0, 3).map(c => c.code);
+  }
+  state.compareCodes = state.compareCodes.filter(code => cohorts.some(c => c.code === code));
+  if (!state.compareCodes.length && cohorts.length) state.compareCodes = cohorts.slice(0, 3).map(c => c.code);
+  document.getElementById('comparePicker').innerHTML = cohorts.map(cohort => `
+    <button class="compare-pill ${state.compareCodes.includes(cohort.code) ? 'active' : ''}" type="button" data-code="${escapeHTML(cohort.code)}">${escapeHTML(cohort.code)}</button>
+  `).join('');
+}
+
+function renderCompare() {
+  const cohorts = getFilteredCohorts().filter(cohort => state.compareCodes.includes(cohort.code));
+  const table = document.getElementById('compareTable');
+  if (!cohorts.length) {
+    table.innerHTML = '';
+    return;
+  }
+  const headers = ['<th>Axis</th>', ...cohorts.map(cohort => `<th>${escapeHTML(cohort.code)}<br><span style="color:var(--muted);font-weight:500">${escapeHTML(shortName(cohort))}</span></th>`)].join('');
+  const rows = state.axes.map(axis => `
+    <tr>
+      <td><strong>${escapeHTML(axisLabel(axis))}</strong></td>
+      ${cohorts.map(cohort => `<td>${inlineMd(cohort.values[axis] || '')}</td>`).join('')}
+    </tr>
+  `).join('');
+  table.innerHTML = `<thead><tr>${headers}</tr></thead><tbody>${rows}</tbody>`;
+}
+
+function shortName(cohort) {
+  return cohort.title.replace(/^([A-Z][0-9][a-z]?|F0)\s+—\s+/, '');
+}
+
+function renderPlot() {
+  const plot = document.getElementById('plot');
+  const xAxis = document.getElementById('xAxisSelect').value || state.axes[0];
+  const yAxis = document.getElementById('yAxisSelect').value || state.axes[1] || state.axes[0];
+  const colorBy = document.getElementById('colorSelect').value;
+  const cohorts = getFilteredCohorts();
+  renderStats();
+
+  document.getElementById('xLow').textContent = `${t('low')} ${axisLabel(xAxis)}`;
+  document.getElementById('xHigh').textContent = `${t('high')} ${axisLabel(xAxis)}`;
+  document.getElementById('yLow').textContent = `${t('low')} ${axisLabel(yAxis)}`;
+  document.getElementById('yHigh').textContent = `${t('high')} ${axisLabel(yAxis)}`;
+
+  for (const point of plot.querySelectorAll('.point')) point.remove();
+
+  const used = new Map();
+  for (const cohort of cohorts) {
+    const xScore = scoreAxis(cohort, xAxis);
+    const yScore = scoreAxis(cohort, yAxis);
+    const jitter = collisionJitter(used, xScore, yScore, cohort.code);
+    const x = clamp(7 + (xScore * 86) + jitter.x, 5, 95);
+    const y = clamp(93 - (yScore * 86) + jitter.y, 5, 95);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = [
+      'point',
+      `family-${cohort.family}`,
+      cohort.decision === 'priority' ? 'priority' : '',
+      cohort.code === state.selectedCode ? 'selected' : ''
+    ].join(' ');
+    button.style.left = `${x}%`;
+    button.style.top = `${y}%`;
+    button.title = `${cohort.title}\n${axisLabel(xAxis)}: ${cohort.values[xAxis] || ''}\n${axisLabel(yAxis)}: ${cohort.values[yAxis] || ''}`;
+    button.innerHTML = `<span class="dot" style="${colorBy === 'decision' ? `background:${decisionColor(cohort.decision)}` : ''}"></span><span class="label">${escapeHTML(cohort.code)}</span>`;
+    button.addEventListener('click', () => {
+      state.selectedCode = cohort.code;
+      renderPlot();
+    });
+    plot.appendChild(button);
+  }
+
+  renderDetail();
+}
+
+function collisionJitter(used, xScore, yScore, code) {
+  const key = `${Math.round(xScore * 10)}:${Math.round(yScore * 10)}`;
+  const count = used.get(key) || 0;
+  used.set(key, count + 1);
+  if (count === 0) return { x: 0, y: 0 };
+  const angle = (hashString(code) % 360) * Math.PI / 180;
+  const radius = 1.8 + Math.min(count, 4) * 1.2;
+  return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+}
+
+function renderDetail() {
+  const xAxis = document.getElementById('xAxisSelect').value || state.axes[0];
+  const yAxis = document.getElementById('yAxisSelect').value || state.axes[1] || state.axes[0];
+  const cohort = state.cohorts.find(c => c.code === state.selectedCode) || getFilteredCohorts()[0];
+  const card = document.getElementById('detailCard');
+  if (!cohort) {
+    card.innerHTML = `<p>${escapeHTML(t('noSelection'))}</p>`;
+    return;
+  }
+
+  const xScore = scoreAxis(cohort, xAxis);
+  const yScore = scoreAxis(cohort, yAxis);
+  card.innerHTML = `
+    <div class="code">${escapeHTML(cohort.code)}</div>
+    <h3>${escapeHTML(cohort.title)}</h3>
+    <p>${escapeHTML(decisionLabel(cohort.decision))}</p>
+    <div class="kv">
+      <div><strong>${escapeHTML(axisLabel(xAxis))} · ${escapeHTML(t('score'))} ${xScore.toFixed(2)}</strong><span>${inlineMd(cohort.values[xAxis] || '')}</span></div>
+      <div><strong>${escapeHTML(axisLabel(yAxis))} · ${escapeHTML(t('score'))} ${yScore.toFixed(2)}</strong><span>${inlineMd(cohort.values[yAxis] || '')}</span></div>
+      <div><strong>${escapeHTML(t('decision'))}</strong><span>${inlineMd(cohort.values['Confidence / decision / unknowns'] || '')}</span></div>
+    </div>
+  `;
+}
+
+function scoreAxis(cohort, axis) {
+  const value = (cohort.values[axis] || '').toLowerCase();
+  if (!value || value.includes('unknown') || value.includes('неизвестно')) return .08;
+
+  if (axis === 'Drivers D1-D4') return scoreDrivers(value);
+  if (axis === 'Life stage') return scoreAge(value);
+  if (axis === 'Mobility state') return scoreDictionary(value, {
+    'forced': .95, 'multi-base': .9, 'frequent': .86, 'slowmad': .72, 'slow': .62,
+    'pre-move': .55, 'returning': .45, 'settled-abroad': .4, 'settled': .25,
+    'вынужден': .95, 'часто переезж': .86, 'медленно переезж': .62, 'перед переезд': .55,
+    'возвращ': .45, 'осел за рубежом': .4, 'осед': .25, 'осел': .25
+  }, .45);
+  if (axis === 'Privacy / trust posture') return scoreIntensity(value, {
+    'maximum': .97, 'максим': .97, 'very high': .9, 'очень высок': .9,
+    'high': .78, 'высок': .78, 'medium-high': .65, 'средне-высок': .65,
+    'medium': .48, 'средн': .48, 'low': .18, 'низк': .18
+  });
+  if (axis === 'Planning / anxiety pattern') return scoreIntensity(value, {
+    'very high': .92, 'очень высок': .92, 'high': .78, 'высок': .78,
+    'medium-high': .64, 'средне-высок': .64, 'medium': .48, 'средн': .48, 'low': .18, 'низк': .18
+  });
+  if (axis === 'Capital level') return scoreDictionary(value, {
+    '$2m': .92, '$1m': .85, 'high income': .78, 'high savings': .74, 'high complexity': .72,
+    'medium-high': .64, 'medium': .48, 'modest': .32, 'thin': .22, 'low-medium': .3,
+    'высокий доход': .78, 'высокая зарплата': .78, 'высокий savings': .74, 'высокая сложность': .72,
+    'средне-высок': .64, 'средн': .48, 'скромн': .32, 'тонк': .22, 'низко-сред': .3
+  }, .42);
+  if (axis === 'Status') return scoreDictionary(value, {
+    'founder': .86, 'operator': .82, 'freelancer': .68, 'contractor': .66, 'relocant': .64,
+    'professional': .58, 'assignee': .48, 'employee': .42, 'retiree': .34, 'breadwinner': .52,
+    'основатель': .86, 'оператор': .82, 'фрилансер': .68, 'релокант': .64,
+    'профессионал': .58, 'командирован': .48, 'сотрудник': .42, 'пенсионер': .34, 'кормилец': .52
+  }, .45);
+  if (axis === 'Money-movement need') return scoreDictionary(value, {
+    'blocked': .94, 'route': .88, 'family support': .82, 'remittance': .78, 'liquidity': .74,
+    'asset transfer': .7, 'cross-border': .66, 'fx': .55, 'not central': .15, 'not a cross-border': .12,
+    'заблок': .94, 'маршрут': .88, 'поддержка семьи': .82, 'перевод': .78, 'ликвидност': .74,
+    'перенос актив': .7, 'кросс-бордер': .66, 'не централь': .15
+  }, tokenDensity(value));
+  if (axis === 'Rails used / needed') return scoreDictionary(value, {
+    'p2p': .95, 'usdt': .9, 'otc': .88, 'crypto': .84, 'remittance': .72, 'swift': .66,
+    'wise': .58, 'revolut': .56, 'local bank': .52, 'bank': .45, 'normal bank': .25,
+    'локальный банк': .52, 'локальные банки': .52, 'банк': .45, 'банков': .45, 'перевод': .72, 'крипто': .84
+  }, tokenDensity(value));
+  if (axis === 'Regulatory / trust risk') return scoreDictionary(value, {
+    'high': .88, 'sanctions': .92, 'fraud': .9, 'payment': .82, 'legal': .72, 'tax': .68,
+    'securities': .66, 'advice boundary': .58, 'b2b2c': .5, 'weak': .25,
+    'высок': .88, 'санкц': .92, 'мошен': .9, 'плат': .82, 'юрид': .72, 'налог': .68,
+    'граница': .58, 'слаб': .25
+  }, .45);
+  if (axis === 'Confidence / decision / unknowns') return scoreDictionary(value, {
+    'priority candidate': .9, 'high': .76, 'keep': .58, 'medium': .48,
+    'needs more evidence': .25, 'use case': .3, 'calibration': .12, 'unknown': .08,
+    'приоритет': .9, 'высок': .76, 'оставить': .58, 'средн': .48,
+    'нужно больше доказательств': .25, 'сценарий использования': .3, 'калибров': .12, 'неизвест': .08
+  }, .45);
+
+  return clamp(Math.max(scoreIntensity(value), tokenDensity(value), scoreComplexity(value)), 0, 1);
+}
+
+function scoreDrivers(value) {
+  const full = (value.match(/●/g) || []).length;
+  const half = (value.match(/◐/g) || []).length;
+  const none = (value.match(/—/g) || []).length;
+  const total = full + half + none;
+  return total ? clamp((full + half * .5) / total, 0, 1) : .5;
+}
+
+function scoreAge(value) {
+  const nums = [...value.matchAll(/\d+/g)].map(m => Number(m[0])).filter(n => n >= 18 && n <= 90);
+  if (nums.length) {
+    const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
+    return clamp((avg - 20) / 55, 0, 1);
+  }
+  if (value.includes('retire')) return .78;
+  if (value.includes('mid-career')) return .48;
+  return .45;
+}
+
+function scoreIntensity(value, overrides = {}) {
+  for (const [key, score] of Object.entries(overrides)) {
+    if (value.includes(key)) return score;
+  }
+  if (value.includes('very high') || value.includes('maximum')) return .9;
+  if (value.includes('очень высок') || value.includes('максим')) return .9;
+  if (value.includes('medium-high')) return .65;
+  if (value.includes('средне-высок')) return .65;
+  if (value.includes('high')) return .75;
+  if (value.includes('высок')) return .75;
+  if (value.includes('low-medium')) return .3;
+  if (value.includes('низко-сред')) return .3;
+  if (value.includes('medium')) return .48;
+  if (value.includes('средн')) return .48;
+  if (value.includes('low')) return .18;
+  if (value.includes('низк')) return .18;
+  if (value.includes('not central') || value.includes('not core')) return .14;
+  if (value.includes('не централь') || value.includes('не ядро')) return .14;
+  return 0;
+}
+
+function scoreDictionary(value, dictionary, fallback) {
+  let best = 0;
+  for (const [key, score] of Object.entries(dictionary)) {
+    if (value.includes(key)) best = Math.max(best, score);
+  }
+  return best || fallback || 0;
+}
+
+function tokenDensity(value) {
+  const terms = [
+    'cross-border', 'multi', 'family', 'support', 'tax', 'visa', 'fx', 'property', 'pension', 'crypto', 'p2p', 'bank', 'route', 'local', 'advisor', 'school', 'healthcare', 'inheritance',
+    'кросс-бордер', 'семья', 'поддержка', 'налог', 'виза', 'недвижимость', 'пенси', 'крипто', 'банк', 'маршрут', 'локальн', 'консульт', 'школ', 'медицин', 'наслед'
+  ];
+  const hits = terms.filter(term => value.includes(term)).length;
+  return clamp(.15 + hits * .08, .12, .82);
+}
+
+function scoreComplexity(value) {
+  const separators = (value.match(/[,;/+→]/g) || []).length;
+  const currencies = (value.match(/\b(usd|eur|gbp|rub|uah|byn|aed|chf|usdt)\b/g) || []).length;
+  return clamp(.18 + separators * .045 + currencies * .08, .15, .85);
+}
+
+function decisionColor(decision) {
+  return {
+    priority: 'var(--accent)',
+    keep: 'var(--accent-2)',
+    'use-case': 'var(--warn)',
+    'needs-evidence': 'var(--bad)',
+    calibration: 'var(--purple)',
+    unknown: 'var(--muted)'
+  }[decision] || 'var(--muted)';
+}
+
+function hashString(value) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = ((hash << 5) - hash) + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function bindEvents() {
+  document.getElementById('langSelect').addEventListener('change', event => {
+    state.lang = event.target.value;
+    hydrateControls();
+    renderAll();
+  });
+  document.getElementById('reloadBtn').addEventListener('click', loadMarkdown);
+
+  for (const id of ['searchInput', 'familyFilter', 'decisionFilter']) {
+    document.getElementById(id).addEventListener('input', () => {
+      renderTable();
+      renderVisualViews();
+      renderPlot();
+    });
+  }
+  for (const id of ['xAxisSelect', 'yAxisSelect', 'colorSelect']) {
+    document.getElementById(id).addEventListener('change', renderPlot);
+  }
+  document.getElementById('viewTabs').addEventListener('click', event => {
+    const tab = event.target.closest('.view-tab');
+    if (!tab) return;
+    state.activeView = tab.dataset.view;
+    renderViewTabs();
+  });
+  document.getElementById('comparePicker').addEventListener('click', event => {
+    const pill = event.target.closest('.compare-pill');
+    if (!pill) return;
+    const code = pill.dataset.code;
+    if (state.compareCodes.includes(code)) {
+      state.compareCodes = state.compareCodes.filter(item => item !== code);
+    } else {
+      state.compareCodes = [...state.compareCodes, code].slice(-6);
+    }
+    renderComparePicker();
+    renderCompare();
+  });
+}
+
+bindEvents();
+loadMarkdown();
+</script>
+</body>
+</html>

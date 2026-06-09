@@ -1,0 +1,10 @@
+{
+  "name": "audience-visualizer",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "sh -c 'python3 -m http.server 8787 --bind 127.0.0.1 & pid=$!; trap \"kill $pid\" INT TERM EXIT; sleep 0.6; open http://127.0.0.1:8787/ >/dev/null 2>&1 || true; wait $pid'",
+    "serve": "python3 -m http.server 8787 --bind 127.0.0.1",
+    "pages:check": "python3 - <<'PY'\nfrom pathlib import Path\nrequired = ['index.html', 'audience_visualizer.html', 'audience_02.md', '.github/workflows/pages.yml']\nmissing = [p for p in required if not Path(p).exists()]\nif missing:\n    raise SystemExit('Missing files: ' + ', '.join(missing))\nprint('GitHub Pages workflow bundle OK')\nPY"
+  }
+}
